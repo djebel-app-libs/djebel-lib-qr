@@ -1,8 +1,9 @@
 # djebel-lib-qr
 
-Draws a text as a QR code in SVG — `Djebel_Lib_Qr`. An optional short word can sit in the middle
-of the code, for a brand name on a printed sticker. Nothing is stored and nothing is fetched:
-a text goes in, markup comes out.
+Draws a text as a QR code — `Djebel_Lib_Qr`. One call, `generate()`, and the code comes back as
+SVG unless another type is asked for. An optional short word can sit in the middle of the code,
+for a brand name on a printed sticker. Nothing is stored and nothing is fetched: a text goes in,
+the code comes out.
 
 ## Usage
 
@@ -15,30 +16,35 @@ $qr_params = [
     'label' => 'Example',
 ];
 
-$res_obj = $qr_obj->generateSvg($qr_params);
+$res_obj = $qr_obj->generate($qr_params);
 
 if ($res_obj->isError()) {
     return $res_obj;
 }
 
-echo $res_obj->svg;
+echo $res_obj->output;
 ```
 
 | Param | | |
 |---|---|---|
 | `text` | required | What the code holds. Spaces around it are dropped. |
 | `label` | optional | A short word written in the middle of the code. |
+| `type` | optional | What comes back: one of the `Djebel_Lib_Qr::TYPE_*` constants. `TYPE_SVG` when left out. |
 
-The markup is an `<svg>` with a `viewBox` and no fixed size, so the page or the printer decides
-how large it is. It carries no XML header, since it is meant to go inside a page.
+The code is always in the Result's `output`, whatever the type, so switching type is a change
+of that one param.
+
+`TYPE_SVG` gives an `<svg>` with a `viewBox` and no fixed size, so the page or the printer
+decides how large it is. It carries no XML header, since it is meant to go inside a page.
 
 ## When it refuses
 
-`generateSvg()` always returns a `Dj_App_Result`. On failure `svg` is empty, `code` says why, and
+`generate()` always returns a `Dj_App_Result`. On failure `output` is empty, `code` says why, and
 `msg` is a sentence that is safe to show.
 
 | Code | Meaning |
 |---|---|
+| `qr.type_unsupported` | The `type` asked for is not one of the `TYPE_*` constants. |
 | `qr.text_missing` | No text was given. |
 | `qr.text_too_long` | The text is longer than a QR code can hold (`Djebel_Lib_Qr::MAX_TEXT_LENGTH` bytes). |
 | `qr.label_too_long` | The word is longer than `Djebel_Lib_Qr::MAX_LABEL_LENGTH` letters. |
@@ -61,9 +67,9 @@ was in. The same text without a word is still drawn.
 
 | Hook | Kind | Receives | Purpose |
 |---|---|---|---|
-| `app.lib.qr.filter.svg` | filter | `Dj_App_Result` | change or replace the answer before it reaches the caller |
+| `app.lib.qr.filter.output` | filter | `Dj_App_Result` | change or replace the answer before it reaches the caller |
 
-The listener also receives a `$ctx` array with `params`, what `generateSvg()` was called with.
+The listener also receives a `$ctx` array with `params`, what `generate()` was called with.
 
 ## Requirements
 

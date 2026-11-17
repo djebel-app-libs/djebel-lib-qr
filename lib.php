@@ -3,7 +3,7 @@
 lib_id: djebel-lib-qr
 lib_name: Djebel QR
 version: 1.0.0
-description: Draws a text as a QR code in SVG (Djebel_Lib_Qr), with an optional word in its middle. The package that builds the code is read only when a code is drawn.
+description: Draws a text as a QR code (Djebel_Lib_Qr), in SVG unless asked otherwise, with an optional word in its middle. The package that builds the code is read only when a code is drawn.
 min_php_ver: 7.4
 */
 
@@ -14,6 +14,9 @@ if (class_exists('Djebel_Lib_Qr')) {
 }
 
 class Djebel_Lib_Qr {
+    // What generate() can give back, picked with its 'type' param. The first one is the default.
+    const TYPE_SVG = 'svg';
+
     // Where the two packages sit, relative to this file, each in the folder its author released.
     const PACKAGES_DIR = 'shared/qr-lib';
 
@@ -64,29 +67,41 @@ class Djebel_Lib_Qr {
     }
 
     /**
-     * Draws a text as a QR code and returns it as SVG markup. The markup has a viewBox and no
-     * fixed size, so it scales to any screen or print size. A label is written into a space
-     * cleared in the middle of the code.
+     * Draws a text as a QR code and returns it in the type asked for: SVG markup when none is.
+     * The markup has a viewBox and no fixed size, so it scales to any screen or print size. A
+     * label is written into a space cleared in the middle of the code.
      *
      * $qr_obj = Djebel_Lib_Qr::getInstance();
-     * $res_obj = $qr_obj->generateSvg([ 'text' => 'https://example.com/v/AB1234CD', 'label' => 'Example', ]);
-     * echo $res_obj->svg;
+     * $res_obj = $qr_obj->generate([ 'text' => 'https://example.com/v/AB1234CD', 'label' => 'Example', ]);
+     * echo $res_obj->output;
      *
      * @param array $params text  (required) what the code holds, MAX_TEXT_LENGTH bytes at most,
      *                            and MAX_LABELED_TEXT_LENGTH at most when a label is given;
-     *                      label (optional) a short word, MAX_LABEL_LENGTH characters at most.
-     * @return Dj_App_Result svg (string, empty when it failed). On failure code says why and msg
-     *                       is safe to show.
+     *                      label (optional) a short word, MAX_LABEL_LENGTH characters at most;
+     *                      type  (optional) what comes back, one of the TYPE_* constants;
+     *                            TYPE_SVG when left out.
+     * @return Dj_App_Result output (string, empty when it failed): the code, in the type asked
+     *                       for. On failure code says why and msg is safe to show.
      */
-    public function generateSvg($params = []) {
+    public function generate($params = []) {
         $res_obj = new Dj_App_Result();
-        $res_obj->svg = '';
+        $res_obj->output = '';
 
         $ctx = [
             'params' => $params,
         ];
 
         try {
+            $type = Dj_App_Util::getField('type', $params, self::TYPE_SVG);
+
+            // Strict on purpose: on PHP 7.4 a loose compare reads the number 0 as equal to any word.
+            if ($type !== self::TYPE_SVG) {
+                throw new Dj_App_Validation_Exception('This type of QR code output is not supported.', [
+                    'code' => 'qr.type_unsupported',
+                    'type' => $type,
+                ]);
+            }
+
             $text = Dj_App_Util::getField('text', $params);
 
             // A text is a string or a number; an array or an object is read as no text at all.
@@ -202,7 +217,7 @@ class Djebel_Lib_Qr {
                 $svg = substr_replace($svg, $label_svg, $svg_end_pos, 0);
             }
 
-            $res_obj->svg = $svg;
+            $res_obj->output = $svg;
             $res_obj->status = true;
         } catch (Dj_App_Validation_Exception $e) {
             $res_obj->code = $e->getErrorCode();
@@ -228,7 +243,7 @@ class Djebel_Lib_Qr {
         }
 
         // A listener can change or replace the answer before it reaches the caller.
-        $res_obj = Dj_App_Hooks::applyFilter('app.lib.qr.filter.svg', $res_obj, $ctx);
+        $res_obj = Dj_App_Hooks::applyFilter('app.lib.qr.filter.output', $res_obj, $ctx);
 
         return $res_obj;
     }
